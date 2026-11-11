@@ -1,0 +1,52 @@
+name: Compiler l'APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Preparer le projet Android
+        run: |
+          cp main.dart /tmp/main.dart
+          flutter create --platforms=android --org com.lecteur3d --project-name lecteur3d .
+          cp /tmp/main.dart lib/main.dart
+          rm -rf test
+          python3 - <<'PY'
+          import pathlib, re
+          p = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text(encoding="utf-8")
+          perms = ('    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>\n'
+                   '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n')
+          if "READ_MEDIA_VIDEO" not in s:
+              s = s.replace("<application", perms + "    <application", 1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Lecteur 3D"', s, count=1)
+          p.write_text(s, encoding="utf-8")
+          PY
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Lecteur 3D (build ${{ github.run_number }})
+          files: build/app/outputs/flutter-apk/app-release.apk
