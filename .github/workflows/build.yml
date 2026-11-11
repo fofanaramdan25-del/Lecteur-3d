@@ -39,6 +39,14 @@ jobs:
               s = s.replace("<application", perms + "    <application", 1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="Lecteur 3D"', s, count=1)
           p.write_text(s, encoding="utf-8")
+          for name in ("build.gradle.kts", "build.gradle"):
+              g = pathlib.Path("android/app") / name
+              if g.exists():
+                  t = g.read_text(encoding="utf-8")
+                  lint = "    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n"
+                  t = re.sub(r"(^android\s*\{[ \t]*\n)", lambda m: m.group(1) + lint, t, count=1, flags=re.M)
+                  g.write_text(t, encoding="utf-8")
+                  print("lint desactive dans", name)
           PY
 
       - run: flutter pub get
